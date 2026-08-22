@@ -1,0 +1,17 @@
+# Secrets and local state must never reach the image.
+.env
+.env.*
+!.env.example
+data/
+venv/
+.git/
+.gitignore
+
+__pycache__/
+*.pyc
+*.pyo
+.DS_Store
+
+# Not needed at run time.
+tests/
+README.md

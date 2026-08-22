@@ -1,0 +1,221 @@
+<!-- Dashboard page -->
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{{ app_name }}</title>
+    <link rel="stylesheet" href="/static/css/style.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">
+        <span class="mark" aria-hidden="true">◆</span>
+        <h1>{{ app_name }}</h1>
+      </div>
+      <div class="range">
+        <label for="range-select">Showing</label>
+        <select id="range-select">
+          <option value="month">This month</option>
+          <option value="3m">Last 3 months</option>
+          <option value="year">This year</option>
+          <option value="all" selected>All time</option>
+        </select>
+      </div>
+    </header>
+
+    <!-- Transient success/error messages land here -->
+    <div id="toast" class="toast" hidden></div>
+
+    <main>
+      <!-- Budget warnings, only rendered when something needs attention -->
+      <section id="alerts" class="alerts" hidden></section>
+
+      <section class="stats" aria-label="Summary">
+        <article class="stat">
+          <p class="stat-label">Income</p>
+          <p class="stat-value income" id="stat-income">—</p>
+        </article>
+        <article class="stat">
+          <p class="stat-label">Expenses</p>
+          <p class="stat-value expense" id="stat-expense">—</p>
+        </article>
+        <article class="stat">
+          <p class="stat-label">Net</p>
+          <p class="stat-value" id="stat-net">—</p>
+        </article>
+        <article class="stat">
+          <p class="stat-label">Savings rate</p>
+          <p class="stat-value" id="stat-rate">—</p>
+          <p class="stat-sub" id="stat-count"></p>
+        </article>
+      </section>
+
+      <div class="grid">
+        <!-- Left column: entry forms -->
+        <div class="col">
+          <section class="card">
+            <h2 id="form-title">Add a transaction</h2>
+            <form id="tx-form" class="form">
+              <div class="toggle" role="radiogroup" aria-label="Transaction type">
+                <input type="radio" id="type-expense" name="type" value="expense" checked />
+                <label for="type-expense">Expense</label>
+                <input type="radio" id="type-income" name="type" value="income" />
+                <label for="type-income">Income</label>
+              </div>
+
+              <label for="tx-amount">Amount</label>
+              <input id="tx-amount" name="amount" type="number" step="0.01" min="0.01"
+                     placeholder="0.00" required />
+
+              <label for="tx-category">Category</label>
+              <select id="tx-category" name="category" required></select>
+
+              <label for="tx-date">Date</label>
+              <input id="tx-date" name="date" type="date" required />
+
+              <label for="tx-description">Note <span class="hint">(optional)</span></label>
+              <input id="tx-description" name="description" type="text" maxlength="255"
+                     placeholder="e.g. weekly shop" />
+              <!-- Asks the AI to pick a category from the note above -->
+              <button type="button" class="btn subtle" id="suggest-category">
+                Suggest category with AI
+              </button>
+              <p class="hint" id="suggest-note" hidden></p>
+
+              <button type="submit" class="btn primary" id="tx-submit">Add transaction</button>
+              <!-- Only shown while editing an existing row -->
+              <button type="button" class="btn subtle" id="cancel-edit" hidden>Cancel</button>
+            </form>
+          </section>
+
+          <section class="card">
+            <h2>Budgets</h2>
+            <p class="muted">A monthly cap per category. You get a warning at 80%.</p>
+            <form id="budget-form" class="form row">
+              <select id="budget-category" required aria-label="Budget category"></select>
+              <input id="budget-limit" type="number" step="0.01" min="0.01"
+                     placeholder="Monthly limit" required aria-label="Monthly limit" />
+              <button type="submit" class="btn">Set</button>
+            </form>
+            <ul id="budget-list" class="budget-list"></ul>
+          </section>
+        </div>
+
+        <!-- Right column: charts, AI, history -->
+        <div class="col">
+          <section class="card">
+            <h2>Where the money goes</h2>
+            <div class="chart-wrap">
+              <canvas id="category-chart" aria-label="Spending by category"></canvas>
+            </div>
+            <p class="empty" id="category-empty" hidden>No expenses in this range yet.</p>
+          </section>
+
+          <section class="card">
+            <h2>Income vs expenses</h2>
+            <div class="chart-wrap">
+              <canvas id="monthly-chart" aria-label="Monthly income versus expenses"></canvas>
+            </div>
+            <p class="empty" id="monthly-empty" hidden>Log a few transactions to see a trend.</p>
+          </section>
+
+          <section class="card">
+            <div class="card-head">
+              <h2>What's coming</h2>
+              <span class="pill" id="forecast-confidence" hidden></span>
+            </div>
+            <p class="muted" id="forecast-basis">Working out where this month lands…</p>
+
+            <div class="forecast-lead">
+              <article>
+                <p class="stat-label">Spent so far</p>
+                <p class="stat-value" id="forecast-so-far">—</p>
+              </article>
+              <article>
+                <p class="stat-label">Projected by month end</p>
+                <p class="stat-value expense" id="forecast-expense">—</p>
+              </article>
+              <article>
+                <p class="stat-label">Projected net</p>
+                <p class="stat-value" id="forecast-net">—</p>
+              </article>
+            </div>
+
+            <div class="chart-wrap">
+              <canvas id="forecast-chart" aria-label="Expenses recorded and projected"></canvas>
+            </div>
+            <p class="empty" id="forecast-empty" hidden>
+              Log a full month and a forecast will appear here.
+            </p>
+
+            <!-- Budgets the projection says will break, even if they look fine today -->
+            <ul id="forecast-risk" class="risk-list"></ul>
+
+            <h3 class="sub-head" id="forecast-cat-head" hidden>Next month, by category</h3>
+            <ul id="forecast-categories" class="forecast-list"></ul>
+
+            <p class="hint" id="forecast-notes"></p>
+          </section>
+
+          <section class="card ai">
+            <div class="card-head">
+              <h2>Forecast explained</h2>
+              <button id="forecast-explain" class="btn">Explain this forecast</button>
+            </div>
+            <div id="forecast-narrative" class="ai-body muted">
+              The numbers above are worked out from your own history, in plain arithmetic.
+              Click and the AI will talk you through what they actually mean.
+            </div>
+          </section>
+
+          <section class="card ai">
+            <div class="card-head">
+              <h2>AI insights</h2>
+              <button id="insights-btn" class="btn">Analyze my spending</button>
+            </div>
+            <div id="insights-body" class="ai-body muted">
+              Click analyze and the AI will read your transactions and tell you where
+              you could realistically save.
+            </div>
+          </section>
+
+          <section class="card ai">
+            <h2>Ask about your money</h2>
+            <div id="chat-log" class="chat-log" aria-live="polite"></div>
+            <form id="chat-form" class="form row">
+              <input id="chat-input" type="text" maxlength="4000" autocomplete="off"
+                     placeholder="Can I afford a 2000 trip next month?" aria-label="Your question" />
+              <button type="submit" class="btn primary">Ask</button>
+            </form>
+          </section>
+
+          <section class="card">
+            <div class="card-head">
+              <h2>Recent transactions</h2>
+              <span class="muted" id="tx-count"></span>
+            </div>
+            <div class="table-wrap">
+              <table id="tx-table">
+                <thead>
+                  <tr>
+                    <th>Date</th><th>Category</th><th>Note</th>
+                    <th class="right">Amount</th><th></th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+            <p class="empty" id="tx-empty" hidden>Nothing logged yet. Add your first transaction.</p>
+            <button id="load-more" class="btn subtle" hidden>Load more</button>
+          </section>
+        </div>
+      </div>
+    </main>
+
+    <!-- Vendored so the dashboard works offline -->
+    <script src="/static/js/vendor/chart.umd.min.js"></script>
+    <script src="/static/js/charts.js"></script>
+    <script src="/static/js/app.js"></script>
+  </body>
+</html>

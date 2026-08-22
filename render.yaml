@@ -1,0 +1,16 @@
+# Render blueprint. Point Render at this repository and it reads this file —
+# no settings to fill in by hand.
+services:
+  - type: web
+    name: finance-copilot
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
+    envVars:
+      # Never call the Anthropic API, so the demo cannot cost anything.
+      - key: AI_DEMO_MODE
+        value: always
+      # Rebuild the sample history on each fresh container.
+      - key: SEED_DEMO_DATA
+        value: "true"
